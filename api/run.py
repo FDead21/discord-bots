@@ -25,7 +25,6 @@ class handler(BaseHTTPRequestHandler):
         last_posted_id = last_posted_id_bytes.decode('utf-8') if last_posted_id_bytes else None
         print(f"Last posted video ID from memory: {last_posted_id}")
 
-        # --- NEW: Added a try...except block to gracefully handle errors ---
         try:
             feed = feedparser.parse(RSS_FEED_URL)
             if not feed.entries:
