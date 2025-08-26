@@ -5,7 +5,7 @@ import requests
 import json
 import feedparser
 from http.server import BaseHTTPRequestHandler
-from vercel_kv import kv  # Import the Vercel KV library
+from vercel_kv import kv 
 
 # --- CONFIGURATION ---
 RSS_FEED_URL = "https://www.youtube.com/feeds/videos.xml?channel_id=UCWJ2lWNubArHWmf3FIHbfcQ"
