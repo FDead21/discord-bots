@@ -5,16 +5,15 @@ import requests
 import json
 import feedparser
 from http.server import BaseHTTPRequestHandler
-from vercel_kv import KV  # CHANGE #1: Import uppercase KV
+from vercel_kv import KV
 
-# --- CONFIGURATION ---
 RSS_FEED_URL = "https://www.youtube.com/feeds/videos.xml?channel_id=UCWJ2lWNubArHWmf3FIHbfcQ"
 EMBED_COLOR = 16711680 # YouTube Red
 
 class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
-        last_posted_id = KV.get('last_posted_video_id') 
+        last_posted_id = KV.get('last_posted_video_id')
         print(f"Last posted video ID from memory: {last_posted_id}")
 
         feed = feedparser.parse(RSS_FEED_URL)
@@ -55,7 +54,7 @@ class handler(BaseHTTPRequestHandler):
             self.send_to_discord(embed_data)
 
         newest_video_id = new_videos[-1].get('yt_videoid')
-        KV.set('last_posted_video_id', newest_video_id) 
+        KV.set('last_posted_video_id', newest_video_id)
         print(f"Successfully posted and updated last video ID to: {newest_video_id}")
 
         self.send_response(200)
