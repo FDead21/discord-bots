@@ -3,50 +3,89 @@
 import os
 import requests
 import json
+import feedparser
 from http.server import BaseHTTPRequestHandler
 
-# This is the main handler class for the Vercel serverless function.
+# --- CONFIGURATION ---
+RSS_FEED_URL = "https://www.espn.com/espn/rss/nba/news"
+# You can set a custom color for the embed's sidebar (decimal value)
+EMBED_COLOR = 3447003 # A nice blue color
+
 class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
-        """
-        This method is called when a GET request is made to the function's URL.
-        This is where our main logic will live.
-        """
+        try:
+            feed = feedparser.parse(RSS_FEED_URL)
+            if not feed.entries:
+                # If the feed is empty, we can just stop.
+                self.send_response(204) # 204 No Content
+                self.end_headers()
+                return
 
-        # --- 1. Fetch the data you want to post ---
-        # For now, we'll use a static message.
-        # In the future, you would replace this section with code to call a real API
-        # (e.g., fetch top post from r/nba, get scores from a sports API).
-        message_to_send = "🏀 This is an automated test message from my Vercel Python bot!"
+            latest_article = feed.entries[0]
+            title = latest_article.title
+            link = latest_article.link
+            
+            # --- NEW: Extract description and thumbnail ---
+            # The summary from the RSS feed makes a great description.
+            description = latest_article.summary
+            
+            # Try to find a thumbnail image. RSS feeds can hide this in a few places.
+            thumbnail_url = ""
+            if 'media_thumbnail' in latest_article and len(latest_article.media_thumbnail) > 0:
+                thumbnail_url = latest_article.media_thumbnail[0]['url']
+            elif 'links' in latest_article:
+                for l in latest_article.links:
+                    if 'image' in l.get('type', ''):
+                        thumbnail_url = l.href
+                        break
 
-        # --- 2. Send the data to Discord ---
-        self.send_to_discord(message_to_send)
+            # --- NEW: Create an embed object ---
+            # Instead of a simple string, we build a dictionary that Discord understands.
+            embed_data = {
+                "title": title,
+                "description": description,
+                "url": link,
+                "color": EMBED_COLOR,
+                "thumbnail": {"url": thumbnail_url},
+                "footer": {"text": "Source: ESPN"}
+            }
 
-        # --- 3. Send a success response back to the caller (the cron job) ---
+        except Exception as e:
+            print(f"ERROR: Failed to parse RSS feed: {e}")
+            self.send_response(500)
+            self.end_headers()
+            return
+
+        # Send the structured embed data to Discord
+        self.send_to_discord(embed_data)
+        
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.end_headers()
-        response_body = {"status": "success", "message": "Message sent to Discord."}
+        response_body = {"status": "success", "message": f"Posted embed: {title}"}
         self.wfile.write(json.dumps(response_body).encode('utf-8'))
         return
 
-    def send_to_discord(self, message_content):
-        """Sends the provided message to the Discord webhook."""
-
-        # Get the webhook URL from an environment variable for security
+    def send_to_discord(self, embed_data):
+        """
+        Sends a rich embed to the Discord webhook instead of a simple message.
+        """
         webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
-
         if not webhook_url:
             print("ERROR: DISCORD_WEBHOOK_URL environment variable is not set.")
             return
-
-        headers = { "Content-Type": "application/json" }
-        data = { "content": message_content }
-
+            
+        headers = {"Content-Type": "application/json"}
+        
+        # --- NEW: The JSON payload now contains an 'embeds' array ---
+        # We send the embed_data dictionary inside this array.
+        data = {
+            "embeds": [embed_data]
+        }
+        
         try:
             response = requests.post(webhook_url, data=json.dumps(data), headers=headers)
-            response.raise_for_status() # Raises an exception for 4xx/5xx errors
-            print(f"Message sent successfully, status: {response.status_code}")
+            response.raise_for_status()
         except requests.exceptions.RequestException as e:
-            print(f"Error sending message to Discord: {e}")
+            print(f"Error sending embed to Discord: {e}")
