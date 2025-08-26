@@ -16,19 +16,22 @@ class handler(BaseHTTPRequestHandler):
         redis_url = os.environ.get('REDIS_URL')
         if not redis_url:
             self.send_response(500)
+            self.send_header('Content-type', 'text/plain')
+            self.end_headers()
             self.wfile.write("Redis URL not configured.".encode('utf-8'))
             return
         
         r = redis.from_url(redis_url)
-
-        last_posted_id_bytes = r.get('last_posted_video_id')
-        last_posted_id = last_posted_id_bytes.decode('utf-8') if last_posted_id_bytes else None
-        print(f"Last posted video ID from memory: {last_posted_id}")
-
+        
         try:
+            last_posted_id_bytes = r.get('last_posted_video_id')
+            last_posted_id = last_posted_id_bytes.decode('utf-8') if last_posted_id_bytes else None
+            print(f"Last posted video ID from memory: {last_posted_id}")
+
             feed = feedparser.parse(RSS_FEED_URL)
             if not feed.entries:
-                self.send_response(204) # No content
+                self.send_response(204)
+                self.end_headers()
                 return
 
             new_videos = []
@@ -41,6 +44,9 @@ class handler(BaseHTTPRequestHandler):
             if not new_videos:
                 print("No new videos to post.")
                 self.send_response(200)
+                # --- FIX: Added the two missing lines below ---
+                self.send_header('Content-type', 'text/plain')
+                self.end_headers()
                 self.wfile.write("No new videos.".encode('utf-8'))
                 return
             
@@ -55,16 +61,18 @@ class handler(BaseHTTPRequestHandler):
             print(f"Successfully posted and updated last video ID to: {newest_video_id}")
 
             self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.end_headers()
             self.wfile.write(f"Posted {len(new_videos)} new videos.".encode('utf-8'))
             return
 
         except Exception as e:
-            # If anything in the 'try' block fails, this code will run instead of crashing
-            print(f"CRITICAL ERROR: Failed to process RSS feed. Error: {e}")
+            print(f"CRITICAL ERROR: An exception occurred. Error: {e}")
             self.send_response(500)
+            self.send_header('Content-type', 'text/plain')
+            self.end_headers()
             self.wfile.write(f"An error occurred: {e}".encode('utf-8'))
             return
-        # --- END of new try...except block ---
 
     def send_to_discord(self, video_url):
         webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
