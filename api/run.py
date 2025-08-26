@@ -8,8 +8,7 @@ from http.server import BaseHTTPRequestHandler
 
 # --- CONFIGURATION ---
 RSS_FEED_URL = "https://www.espn.com/espn/rss/nba/news"
-# You can set a custom color for the embed's sidebar (decimal value)
-EMBED_COLOR = 3447003 # A nice blue color
+EMBED_COLOR = 16711680 # A sporty red color
 
 class handler(BaseHTTPRequestHandler):
 
@@ -17,20 +16,15 @@ class handler(BaseHTTPRequestHandler):
         try:
             feed = feedparser.parse(RSS_FEED_URL)
             if not feed.entries:
-                # If the feed is empty, we can just stop.
-                self.send_response(204) # 204 No Content
+                self.send_response(204) 
                 self.end_headers()
                 return
 
             latest_article = feed.entries[0]
             title = latest_article.title
             link = latest_article.link
-            
-            # --- NEW: Extract description and thumbnail ---
-            # The summary from the RSS feed makes a great description.
             description = latest_article.summary
             
-            # Try to find a thumbnail image. RSS feeds can hide this in a few places.
             thumbnail_url = ""
             if 'media_thumbnail' in latest_article and len(latest_article.media_thumbnail) > 0:
                 thumbnail_url = latest_article.media_thumbnail[0]['url']
@@ -40,14 +34,13 @@ class handler(BaseHTTPRequestHandler):
                         thumbnail_url = l.href
                         break
 
-            # --- NEW: Create an embed object ---
-            # Instead of a simple string, we build a dictionary that Discord understands.
             embed_data = {
                 "title": title,
                 "description": description,
                 "url": link,
                 "color": EMBED_COLOR,
-                "thumbnail": {"url": thumbnail_url},
+                # --- CHANGE #1: Use 'image' instead of 'thumbnail' for a large banner ---
+                "image": {"url": thumbnail_url},
                 "footer": {"text": "Source: ESPN"}
             }
 
@@ -57,7 +50,6 @@ class handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        # Send the structured embed data to Discord
         self.send_to_discord(embed_data)
         
         self.send_response(200)
@@ -68,9 +60,6 @@ class handler(BaseHTTPRequestHandler):
         return
 
     def send_to_discord(self, embed_data):
-        """
-        Sends a rich embed to the Discord webhook instead of a simple message.
-        """
         webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
         if not webhook_url:
             print("ERROR: DISCORD_WEBHOOK_URL environment variable is not set.")
@@ -78,9 +67,9 @@ class handler(BaseHTTPRequestHandler):
             
         headers = {"Content-Type": "application/json"}
         
-        # --- NEW: The JSON payload now contains an 'embeds' array ---
-        # We send the embed_data dictionary inside this array.
         data = {
+            # --- CHANGE #2: Add a 'content' field for a message above the embed ---
+            "content": "🏀 Here's the latest NBA news!",
             "embeds": [embed_data]
         }
         
